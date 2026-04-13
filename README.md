@@ -1,6 +1,6 @@
 # extract-tls-secrets
 
-改自https://github.com/neykov/extract-tls-secrets/tree/master?tab=readme-ov-file
+改自：https://github.com/neykov/extract-tls-secrets/tree/master?tab=readme-ov-file
 
 jattach地址：https://github.com/jattach/jattach?tab=readme-ov-file
 

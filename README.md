@@ -1,140 +1,31 @@
 # extract-tls-secrets
 
-Decrypt HTTPS/TLS connections on-the-fly. Extract the shared secrets from 
-secure TLS connections for use with [Wireshark](https://www.wireshark.org/).
-Attach to a Java process on either side of the connection to start decrypting.
+改自https://github.com/neykov/extract-tls-secrets/tree/master?tab=readme-ov-file
 
-## Usage
+## 使用方式
 
-Download from [extract-tls-secrets-4.0.0.jar](https://repo1.maven.org/maven2/name/neykov/extract-tls-secrets/4.0.0/extract-tls-secrets-4.0.0.jar).
-Then attach to a Java process in one of two ways:
-
-### Attach on startup 
-
-Add a startup argument to the JVM options: `-javaagent:<path to jar>/extract-tls-secrets-4.0.0.jar=<path to secrets log file>`
-
-For example to launch an application from a jar file run:
+### 直接启用
+```shell script
+./jattach 3784617 load instrument false "/data/sjc/ec/jm-tls-secrets-4.1.2.jar=http://localhost:8091/tlsKey.do"
+```
 
 ```shell script
-java -javaagent:~/Downloads/extract-tls-secrets-4.0.0.jar=/tmp/secrets.log -jar MyApp.jar
+./jattach <pid> load instrument false "/data/sjc/ec/jm-tls-secrets-4.1.2.jar=调用接口的全路径"
 ```
-
-To launch in Tomcat add the parameter to `CATALINA_OPTS`:
-
+### 开启
 ```shell script
-CATALINA_OPTS=-javaagent:~/Downloads/extract-tls-secrets-4.0.0.jar=/tmp/secrets.log bin/catalina.sh run
+
+sh inject.sh 8080,10179 /data/sjc/ec/jm-tls-secrets-4.1.2.jar http://127.0.0.1:8091/tlsKey.do@true
 ```
 
-### Attach to a running process
-
-Attaching to an existing Java process requires a JDK install with `JAVA_HOME` 
-pointing to it.
-
-To list the available process IDs run:
-
-```
-java -jar ~/Downloads/extract-tls-secrets-4.0.0.jar list
-```
-
-Next attach to the process by executing:
-
-```
-java -jar ~/Downloads/extract-tls-secrets-4.0.0.jar <pid> /tmp/secrets.log
-```
-
-### Decrypt the capture in Wireshark
-
-To decrypt the capture you need to let Wireshark know where the secrets file is. 
-Configure the path in
-`Preferences > Protocols > TLS (SSL for older versions) > (Pre)-Master-Secret log filename`.
-
-Alternatively start Wireshark with:
-
-```
-wireshark -o tls.keylog_file:/tmp/secrets.log
-```
-
-The packets will be decrypted in real-time.
-
-For a step-by-step tutorial of using the secrets log file (SSLKEYLOGFILE as referenced usually)
-refer to the Peter Wu's [Debugging TLS issues with Wireshark](https://lekensteyn.nl/files/wireshark-tls-debugging-sharkfest19eu.pdf)
-presentation. Even more information can be found at the [Wireshark TLS](https://wiki.wireshark.org/TLS) page. 
-
-## Requirements
-
-Requires at least Oracle/OpenJDK Java 6. Does not support IBM Java and custom 
-security providers like Bouncy Castle, Conscrypt.
-
-## Building
-
-```
-git clone https://github.com/neykov/extract-tls-secrets.git
-cd extract-tls-secrets
-mvn clean package
-```
-
-Running the integration tests requires Docker to be installed on the system:
-
+### 关闭
 ```shell script
-mvn verify
+
+sh inject.sh 8080,10179 /data/sjc/ec/jm-tls-secrets-4.1.2.jar http://127.0.0.1:8091/tlsKey.do
 ```
+## 说明
 
-## Troubleshooting
+配合jattach进行注入可解决环境上的tools.jar冲突和不存在等问题
 
-If you get an empty window after selecting "Follow/TLS Stream" from the context menu
-or are not seeing HTTP protocol packets in the packet list then you can fix this by either:
-  * Save the capture as a file and open it again
-  * In the Wireshark settings in "Procotols/TLS" toggle "Reassemble TLS Application Data spanning multiple SSL records".
-  The exact state of the checkbox doesn't matter, but it will force a reload which will force proper decryption of the packets.
-
-The bug seems to be related to the UI side of wireshark as the TLS debug logs show the message successfully being decrypted.
-
-Reports of the problem:
-  * https://ask.wireshark.org/questions/33879/ssl-decrypt-shows-ok-in-ssl-debug-file-but-not-in-wireshark
-  * https://bugs.wireshark.org/bugzilla/show_bug.cgi?id=9154
-
-
-If "Follow/TLS Stream" is not enabled the server is probably on a non-standard port so Wireshark can't infer that the 
-packets contain TLS traffic. To hint it that it should be decoding the packets as TLS 
-right click on any of the packets to open the context menu, select "Decode As" and add 
-the server port, select "TLS" protocol in the "Current" column. If it's still not able 
-to decrypt try the same by saving the capture in a file and re-opening it.
-
-### Warnings during agent loading
-
-#### EnableDynamicAgentLoading
-
-Starting with Java 21, upon attaching the agent, the target process will print
-the following warning:
-
-> WARNING: A Java agent has been loaded dynamically
-> WARNING: If a serviceability tool is in use, please run with -XX:+EnableDynamicAgentLoading to hide this warning
-> WARNING: If a serviceability tool is not in use, please run with -Djdk.instrument.traceUsage for more information
-> WARNING: Dynamic loading of agents will be disallowed by default in a future release
-
-The warning is informational and does not lead to broken functionality. To suppress
-the warning add `-XX:+EnableDynamicAgentLoading` to the startup options of the target process.
-
-If the target process has disabled dynamic agent loading by setting
-`-XX:-EnableDynamicAgentLoading` at startup, then attaching will fail with:
-> Failed to load agent library: Dynamic agent loading is not enabled. Use -XX:+EnableDynamicAgentLoading to launch target VM.
-
-More details can be found in [JEP 451](https://openjdk.org/jeps/451).
-
-<!-- 
-The warning has been introduced in:
-PEP: https://openjdk.org/jeps/451
-Ticket: https://bugs.openjdk.org/browse/JDK-8306275
-Commit: https://github.com/openjdk/jdk/commit/5bd2af26e66a863edc670229444b3282ba639563#diff-b15006727d01f54cc5d9a7d8ba6629f5445c136ddb94893d89ba359a6fe11e17R517
--->
-
-#### Class path has been appended
-
-When the agent is loaded in the target process, the JVM will print the following warning:
-
-> OpenJDK 64-Bit Server VM warning: Sharing is only supported for boot loader
-> classes because bootstrap classpath has been appended.
-
-This is expected behaviour since the agent modifies the bootstrap classpath during initialisation. 
-The warning exists since [Java 10](https://docs.oracle.com/javase/8/docs/technotes/guides/vm/class-data-sharing.html)
-when the classpath data sharing functionaity has been implemented.
+## 编译
+拉去代码至本地后需要主语tool.jar的引入，已在pom.xml文件中引入tools.jar的相对路径，请配置JAVA_HOME路径以使其生效

@@ -1,0 +1,8 @@
+ARG JAVA_IMAGE_TAG=8
+
+FROM azul/zulu-openjdk:${JAVA_IMAGE_TAG}
+ARG JAVA_IMAGE_TAG
+# azul/zulu-openjdk:6 does not set JAVA_HOME; fall back to the known path for that image
+ENV JAVA_HOME=${JAVA_HOME:-/usr/lib/jvm/zulu-6-amd64}
+
+VOLUME /secrets /project
